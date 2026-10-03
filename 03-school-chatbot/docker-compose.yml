@@ -1,0 +1,47 @@
+﻿volumes:
+  qdrant_data: {}
+
+services:
+    qdrant:
+        image: qdrant/qdrant:latest
+        container_name: ${PROJECT_NAME}-qdrant
+        restart: unless-stopped
+        ports:
+            # host:container — host ports remapped (7333/7334) so a host-side
+            # Qdrant client never clashes with another install on 6333.
+            # Container stays on 6333.
+            - ${QDRANT_REST_PORT:-7333}:6333 # REST API
+        env_file:
+            - .env
+        volumes:
+            - qdrant_data:/qdrant/storage
+
+    # The SIMCC question generator. Sole public UI (consolidated 2026-09-30):
+    # Grade/Topic/Skill/Difficulty/Quantity/MODEL dropdowns; question type is
+    # locked to MCQ server-side. Topic choices come from the grade-filtered MOE
+    # catalogue (workspace/schema/topic_catalog.json, verified against
+    # knowledge-base/moe-syllabus/ by workspace/tools/build_topic_catalog.py).
+    question-form:
+        container_name: ${PROJECT_NAME}-question-form
+        build: ./apps/question-form
+        restart: unless-stopped
+        env_file:
+            - .env
+        ports:
+            - ${WEBUI_PORT:-3000}:5005
+        volumes:
+            # live-reads workspace/schema/topic_catalog.json so catalog edits
+            # are picked up without a rebuild (topic_catalog.json is the source
+            # of truth; simcc_pipe.py embeds a copy guarded by an offline test)
+            - ./workspace:/opt/simcc/workspace:ro
+            # secret vault (API keys etc) mounted read-only; NEVER hardcode keys
+            - ./secrets:/run/secrets/simcc:ro
+        extra_hosts:
+            # Lets the container reach Ollama running on the Windows host
+            - "host.docker.internal:host-gateway"
+        healthcheck:
+          test: ["CMD", "python", "-c", "import urllib.request,sys; r=urllib.request.urlopen('http://localhost:5005/healthz', timeout=5); sys.exit(0 if r.status==200 else 1)" ]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+          start_period: 15s

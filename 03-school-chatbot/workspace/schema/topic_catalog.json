@@ -1,0 +1,73 @@
+{
+  "$comment": "CANONICAL grade->topic catalogue, extracted from MOE Science syllabuses. Regenerate with tools/build_topic_catalog.py after syllabus docs change. NEVER hand-edit codes without also updating tools/build_topic_catalog.py so the two stay consistent. Sources: 'knowledge-base/moe-syllabus/Primary Science Syllabus 2023.pdf' (P3-P6, version 2023) and 'knowledge-base/moe-syllabus/G2-3 Lower Secondary Science Teaching and Learning Syllabus.pdf' (S1/S2 G2-G3 course, implementation from 2024 S1 cohort).",
+  "generated_at": "2026-09-30",
+  "schema_note": "grade key -> array of {code, name, theme} where code is a 1-6 char upper-alnum short code used in question_id: Q-<GRADE>-<CODE>-<6chars>.",
+  "source_documents": {
+    "primary": {
+      "file": "knowledge-base/moe-syllabus/Primary Science Syllabus 2023.pdf",
+      "coverage": "P3, P4, P5, P6 ONLY (document is titled 'Primary Three to Six' - it does NOT cover P1/P2)",
+      "table_ref": "Table 2 p21: 'An Overview of the topics in the Primary Science Syllabus'"
+    },
+    "lower_secondary": {
+      "file": "knowledge-base/moe-syllabus/G2-3 Lower Secondary Science Teaching and Learning Syllabus.pdf",
+      "coverage": "S1, S2 (G2/G3 Lower Secondary course; implementation started with 2024 S1 cohort)",
+      "table_ref": "Table 3 p14: 'Overview of the G2/G3 Lower Secondary Science Syllabuses'"
+    }
+  },
+  "NOT_AVAILABLE": {
+    "P1": "No MOE Syllabus 1-2 document in knowledge-base/moe-syllabus/ yet. UI must not offer any P1 topic options until real sources land (unverified guesswork on this topic is a), 'never guess beyond grade level' (context.md product rule 1).",
+    "P2": "Same status as P1 - no syllabus document supplied yet.",
+    "S3": "Upper Secondary (S3-S4) splits into separate Physics / Chemistry / Biology subjects; no such doc supplied yet. Dropdown will show 'No syllabus data loaded yet' for these grades.",
+    "S4": "Same status as S3."
+  },
+  "s1s2_note": "Both S1 and S2 share the SAME 16-topic G2/G3 LSS syllabus (Lower Secondary runs as a two-year common 'G2/G3' course, not split by year in the source doc). Both keys therefore map to the same topic array.",
+  "grades": {
+    "P3": [
+      {"code": "DIVLT", "name": "Diversity of Living and Non-Living Things", "subtopic": "General characteristics and classification", "theme": "Diversity"},
+      {"code": "DIVMAT", "name": "Diversity of Materials", "subtopic": "", "theme": "Diversity"},
+      {"code": "CYCLIF", "name": "Cycles in Plants and Animals (Life Cycles)", "theme": "Cycles"},
+      {"code": "MAGNET", "name": "Interaction of Forces (Magnets)", "theme": "Interactions"}
+    ],
+    "P4": [
+      {"code": "PLANTS", "name": "Plant System (Plant parts and functions)", "theme": "Systems"},
+      {"code": "DIGEST", "name": "Human System (Digestive system)", "theme": "Systems"},
+      {"code": "MATTER", "name": "Cycles in Matter and Water (Matter)", "theme": "Cycles"},
+      {"code": "LIGHT", "name": "Energy Forms and Uses (Light)", "theme": "Energy"},
+      {"code": "HEAT", "name": "Energy Forms and Uses (Heat)", "theme": "Energy"}
+    ],
+    "P5": [
+      {"code": "REPRO", "name": "Cycles in Plants and Animals (Reproduction)", "subtopic": "Sexual reproduction of flowering plants and humans", "theme": "Cycles"},
+      {"code": "WATER", "name": "Cycles in Matter and Water (Water)", "theme": "Cycles"},
+      {"code": "PLTRC", "name": "Plant System (Respiratory and circulatory systems)", "theme": "Systems"},
+      {"code": "HUMRC", "name": "Human System (Respiratory and circulatory systems)", "theme": "Systems"},
+      {"code": "ELEC", "name": "Electrical System", "theme": "Systems"}
+    ],
+    "P6": [
+      {"code": "PHOTOS", "name": "Energy Forms and Uses (Photosynthesis)", "theme": "Energy"},
+      {"code": "ENCONV", "name": "Energy Conversion", "theme": "Energy"},
+      {"code": "FORCES", "name": "Interaction of Forces (Frictional force, gravitational force, elastic spring force)", "theme": "Interactions"},
+      {"code": "ENVIRON", "name": "Interactions within the Environment", "theme": "Interactions"}
+    ]
+  },
+  "grades_lower_secondary_shared": {
+    "_note": "This array is shared by grade keys 'S1' and 'S2' (same syllabus document).",
+    "topics": [
+      {"code": "SCIEV", "name": "The Scientific Endeavour", "theme": "Scientific Endeavour"},
+      {"code": "MATPHY", "name": "Exploring Diversity of Matter by its Physical Properties", "theme": "Diversity"},
+      {"code": "MATCHEM", "name": "Exploring Diversity of Matter by its Chemical Composition", "theme": "Diversity"},
+      {"code": "SEPTEC", "name": "Exploring Diversity of Matter using Separation Techniques", "theme": "Diversity"},
+      {"code": "RAYLGT", "name": "Ray Model of Light", "theme": "Models"},
+      {"code": "CELLS", "name": "Model of Cells - the Basic Unit of Life", "theme": "Models"},
+      {"code": "PARTIC", "name": "Model of Matter - the Particulate Nature of Matter", "theme": "Models"},
+      {"code": "ATOMS", "name": "Model of Matter - Atoms and Molecules", "theme": "Models"},
+      {"code": "FORCEEN", "name": "Application of Forces and Transfer of Energy", "theme": "Interactions"},
+      {"code": "HEATTR", "name": "Transfer of Heat Energy and its Effects", "theme": "Interactions"},
+      {"code": "CHEMCH", "name": "Chemical Changes", "theme": "Interactions"},
+      {"code": "ECOSYS", "name": "Interactions within Ecosystems", "theme": "Interactions"},
+      {"code": "ELCSYS", "name": "Electrical Systems", "theme": "Systems"},
+      {"code": "DIGSYS", "name": "Human Digestive System", "theme": "Systems"},
+      {"code": "TRNSYS", "name": "Transport Systems in Living Things", "theme": "Systems"},
+      {"code": "REPSYS", "name": "Human Sexual Reproductive System", "theme": "Systems"}
+    ]
+  }
+}

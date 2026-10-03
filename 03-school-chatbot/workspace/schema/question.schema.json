@@ -1,0 +1,170 @@
+{
+  "title": "SIMCCGeneratedQuestion",
+  "type": "object",
+  "required": [
+    "question_id",
+    "grade",
+    "topic",
+    "skill",
+    "difficulty",
+    "format",
+    "stem",
+    "answer_key",
+    "explanation",
+    "curriculum_mapping",
+    "generation_record",
+    "self_checks",
+    "review"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "question_id": {
+      "type": "string",
+      "description": "Stable identifier, format Q-<GRADE>-<TOPIC>-<RANDOM6> (e.g. Q-P5-ELEC-7K2M9X).",
+      "pattern": "^Q-[A-Z0-9]{1,4}-[A-Z0-9]{1,6}-[A-Z0-9]{6}$"
+    },
+    "grade": {
+      "type": "string",
+      "description": "Singapore primary/secondary grade, e.g. P1..P6 or S1..S4."
+    },
+    "topic": {
+      "type": "string",
+      "description": "Short topic code, e.g. ELEC for Electricity."
+    },
+    "topic_name": {
+      "type": "string",
+      "description": "Human-readable topic name, e.g. 'Electricity'."
+    },
+    "skill": {
+      "type": "string",
+      "enum": ["Knowledge", "Understanding", "Application", "Reasoning"],
+      "description": "Cognitive skill assessed."
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["Easy", "Medium", "Hard"],
+      "description": "Target difficulty."
+    },
+    "format": {
+      "type": "string",
+      "enum": ["MCQ", "OpenEnded", "TrueFalse", "FillBlank"],
+      "description": "Question format. MCQ requires options + exactly one correct letter."
+    },
+    "stem": {
+      "type": "string",
+      "description": "The question text. Age-appropriate Singapore academic English."
+    },
+    "options": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "required": ["label", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "enum": ["A", "B", "C", "D", "E", "F"] },
+          "text": { "type": "string" }
+        }
+      },
+      "description": "MCQ options. Exactly 4 (A-D) for MCQ, null for non-MCQ formats."
+    },
+    "answer_key": {
+      "type": "string",
+      "description": "Single correct answer. MCQ: a label (e.g. 'B'). OpenEnded: the expected response."
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Why the answer is correct and why distractors are not."
+    },
+    "curriculum_mapping": {
+      "type": "object",
+      "required": ["objective_text", "objective_source"],
+      "additionalProperties": false,
+      "properties": {
+        "objective_text": {
+          "type": "string",
+          "description": "Which MOE syllabus learning objective this question assesses."
+        },
+        "objective_source": {
+          "type": "string",
+          "description": "Citation of the MOE syllabus doc/section used."
+        }
+      }
+    },
+    "generation_record": {
+      "type": "object",
+      "required": ["sources", "informed_by", "generated_by"],
+      "additionalProperties": false,
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Approved sources that informed generation. Only SIMCC-authorised materials allowed."
+        },
+        "informed_by": {
+          "type": "string",
+          "description": "Brief note on what patterns/rules shaped the question."
+        },
+        "generated_by": {
+          "type": "string",
+          "description": "Model + prompt version used."
+        }
+      }
+    },
+    "self_checks": {
+      "type": "object",
+      "required": ["correctness", "syllabus_fit", "ambiguity", "originality", "difficulty_match", "language"],
+      "additionalProperties": false,
+      "properties": {
+        "correctness": {
+          "type": "string",
+          "enum": ["pass", "fail", "flagged"],
+          "description": "Scientific content and final answer are correct."
+        },
+        "syllabus_fit": {
+          "type": "string",
+          "enum": ["pass", "fail", "flagged"],
+          "description": "No concept outside intended grade/level."
+        },
+        "ambiguity": {
+          "type": "string",
+          "enum": ["pass", "fail", "flagged"],
+          "description": "No unintended second correct answer."
+        },
+        "originality": {
+          "type": "string",
+          "enum": ["pass", "fail", "flagged"],
+          "description": "Not copied or overly similar to source/existing questions."
+        },
+        "difficulty_match": {
+          "type": "string",
+          "enum": ["pass", "fail", "flagged"],
+          "description": "Matches requested cognitive demand, not just longer wording."
+        },
+        "language": {
+          "type": "string",
+          "enum": ["pass", "fail", "flagged"],
+          "description": "Clear Singapore-appropriate academic English for the age level."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free text caveat about the checks above."
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": ["status", "reviewed_by", "reviewed_at", "changed"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["draft", "pending_review", "approved", "rejected", "revised"],
+          "description": "Draft on generate. 'approved'/'rejected' must be set by a human reviewer."
+        },
+        "reviewed_by": { "type": ["string", "null"] },
+        "reviewed_at": { "type": ["string", "null"], "description": "ISO 8601 timestamp when reviewed." },
+        "changed": { "type": ["string", "null"], "description": "What the reviewer changed, if anything." }
+      }
+    }
+  }
+}
