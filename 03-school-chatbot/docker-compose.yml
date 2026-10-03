@@ -1,5 +1,8 @@
 ﻿volumes:
   qdrant_data: {}
+  # SQLite file with every generated question (question_store.py). Named volume,
+  # NOT re-creatable like qdrant_data: `docker compose down -v` deletes it.
+  question_data: {}
 
 services:
     qdrant:
@@ -27,6 +30,8 @@ services:
         restart: unless-stopped
         env_file:
             - .env
+        environment:
+            QUESTION_DB_PATH: /data/questions.db
         ports:
             - ${WEBUI_PORT:-3000}:5005
         volumes:
@@ -36,6 +41,8 @@ services:
             - ./workspace:/opt/simcc/workspace:ro
             # secret vault (API keys etc) mounted read-only; NEVER hardcode keys
             - ./secrets:/run/secrets/simcc:ro
+            # generated-question database (read-write; the mounts above are read-only)
+            - question_data:/data
         extra_hosts:
             # Lets the container reach Ollama running on the Windows host
             - "host.docker.internal:host-gateway"

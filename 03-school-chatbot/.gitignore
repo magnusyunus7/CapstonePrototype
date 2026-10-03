@@ -5,8 +5,10 @@ secrets/
 
 # OS
 .DS_Store
-Thumbs.db
+*.db
 
 # Python
 __pycache__/
 *.pyc
+venv/
+data/

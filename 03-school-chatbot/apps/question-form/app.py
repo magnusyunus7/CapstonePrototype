@@ -10,7 +10,11 @@ Endpoints:
     GET  /api/catalog           full dropdown model (grades->topics + enums)
     GET  /api/catalog/{grade}   topic options for one grade
     POST /api/submit            validate a structured request only (no LLM)
-    POST /api/generate          validate + generate the question sheet
+    POST /api/generate          validate + generate the question sheet (and store it)
+    GET  /api/questions         stored questions (filters: grade, topic_code, skill,
+                                difficulty, review_status, request_id; limit/offset)
+    GET  /api/questions/{id}    one stored question
+    GET  /api/requests/{id}     one generation request + its real retrieval sources
     GET  /healthz               health
 
 Run (dev):
@@ -20,6 +24,7 @@ Run (dev):
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sys
@@ -87,24 +92,50 @@ try:
 except ImportError:  # pragma: no cover
     ai_client = None
 
+try:
+    import question_store  # type: ignore
+except ImportError:  # pragma: no cover - reported in the /api/generate response, not at import
+    question_store = None
+
+logger = logging.getLogger("simcc.form")
+
+# Generated-question storage (SQLite). Path comes from QUESTION_DB_PATH (set in
+# docker-compose.yml to the /data volume). Created lazily on first use so the
+# app still boots, and the validation-only endpoints still work, if storage is
+# misconfigured.
+_STORE = None
+
+
+def _get_store():
+    global _STORE
+    if question_store is None:
+        raise RuntimeError("question_store module not importable (workspace/tools not on sys.path)")
+    if _STORE is None:
+        _STORE = question_store.QuestionStore()  # resolves QUESTION_DB_PATH / defaults
+    return _STORE
+
 
 def _grounding_query_text(spec: dict, extra: str = "") -> str:
     return f"{spec['grade']} {spec['topic_name']} ({spec['topic']}) {spec['theme']} {extra}".strip()
 
 
-def _build_grounding_block_for_spec(spec: dict, extra: str = "") -> str:
-    """Retrieve grounding chunks (just the formatted block string, easy to inject
-    into any prompt) for the given structured spec."""
+def _build_grounding_for_spec(spec: dict, extra: str = "") -> tuple[str, list[dict] | None]:
+    """Retrieve grounding chunks for the given structured spec. Returns
+    (block, sources): `block` is the formatted string injected into the prompt
+    (unchanged behaviour); `sources` is the REAL hit list from Qdrant
+    ({source, page_start, page_end, score}) that we store as provenance.
+    sources is None when no retrieval happened or it was unavailable, and []
+    when retrieval ran but found nothing - the DB keeps that distinction."""
     if rag_client is None:
-        return ""
+        return "", None
     try:
         blk = rag_client.build_grounding_block(
             spec["grade"], spec["topic"], _grounding_query_text(spec, extra),
             top_k_each=RAG_TOP_K_EACH,
         )
-        return blk.get("block", "")
+        return blk.get("block", ""), blk.get("sources", [])
     except rag_client.RagUnavailableError:
-        return "<!-- grounding unavailable; treat as ungrounded and decline to fabricate citations -->"
+        return "<!-- grounding unavailable; treat as ungrounded and decline to fabricate citations -->", None
 
 
 async def _check_originality(q: dict) -> dict:
@@ -348,13 +379,15 @@ async def _call_llm_json(system: str, user: str, *, temperature: float = TEMPERA
     return _extract_json_obj_or_arr(raw)
 
 
-async def _generate_n_questions(spec: dict) -> list[dict]:
+async def _generate_n_questions(spec: dict) -> tuple[list[dict], list[dict] | None]:
     """Call LLM once per question (large JSON-reliable models return ONE JSON
-    object per call when asked to write one question, not a list). Returns up to
-    `quantity` question dicts, in request order."""
-    grounding_block = ""
+    object per call when asked to write one question, not a list). Returns
+    (questions, grounding_sources): up to `quantity` question dicts in request
+    order, plus the real retrieval hits used to ground them (see
+    _build_grounding_for_spec for the None / [] meaning)."""
+    grounding_block, grounding_sources = "", None
     if ENABLE_RAG and rag_client is not None:
-        grounding_block = _build_grounding_block_for_spec(spec)
+        grounding_block, grounding_sources = _build_grounding_for_spec(spec)
     common_prompt = (
         f"EXACT REQUEST SPEC (do not alter any field):\n"
         f"grade={spec['grade']}, topic code={spec['topic']}, "
@@ -378,7 +411,7 @@ async def _generate_n_questions(spec: dict) -> list[dict]:
             obj = obj[0]
         if isinstance(obj, dict) and obj.get("stem"):
             out.append(obj)
-    return out
+    return out, grounding_sources
 
 
 def _build_spec(req: GenerateRequest) -> tuple[dict, dict]:
@@ -486,7 +519,7 @@ async def api_generate(req: GenerateRequest) -> JSONResponse:
     spec, _ = _build_spec(req)
 
     try:
-        questions = await _generate_n_questions(spec)
+        questions, grounding_sources = await _generate_n_questions(spec)
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"Ollama request failed: {e}") from e
     except ValueError as e:
@@ -508,8 +541,70 @@ async def api_generate(req: GenerateRequest) -> JSONResponse:
             q["originality"] = await _check_originality(q)
         cleaned.append(q)
 
+    # Persist the drafts. A storage fault must NOT throw away a finished (and
+    # slow) generation, so it is reported in the response + logged instead of
+    # raised. The UI ignores the extra `storage` key; check it when debugging.
+    storage: dict = {"saved": 0, "error": None}
+    try:
+        saved = _get_store().save_generation(
+            spec, cleaned,
+            grounding_sources=grounding_sources,
+            model=spec.get("model") or AI_MODEL,
+        )
+        storage["saved"] = saved["saved"]
+    except Exception as e:  # noqa: BLE001 - deliberate: see comment above
+        logger.exception("could not store generated questions for request %s", spec["request_id"])
+        storage["error"] = f"{type(e).__name__}: {e}"
+
     spec_out = {**spec, "status": "generated"}
-    return JSONResponse({"ok": True, "spec": spec_out, "questions": cleaned})
+    return JSONResponse({"ok": True, "spec": spec_out, "questions": cleaned, "storage": storage})
+
+
+# ---------------------------------------------------- stored questions (read) --
+@app.get("/api/questions")
+def api_list_questions(
+    grade: str | None = None,
+    topic_code: str | None = None,
+    skill: str | None = None,
+    difficulty: str | None = None,
+    review_status: str | None = None,
+    request_id: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> JSONResponse:
+    """Stored questions, newest first, optionally filtered. Read-only."""
+    try:
+        return JSONResponse(_get_store().list_questions(
+            limit=limit, offset=offset, grade=grade.strip().upper() if grade else None,
+            topic_code=topic_code.strip().upper() if topic_code else None,
+            skill=skill, difficulty=difficulty, review_status=review_status, request_id=request_id,
+        ))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"question store unavailable: {e}") from e
+
+
+@app.get("/api/questions/{question_id}")
+def api_get_question(question_id: str) -> JSONResponse:
+    try:
+        q = _get_store().get_question(question_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"question store unavailable: {e}") from e
+    if q is None:
+        raise HTTPException(status_code=404, detail=f"no stored question {question_id!r}")
+    return JSONResponse(q)
+
+
+@app.get("/api/requests/{request_id}")
+def api_get_request(request_id: str) -> JSONResponse:
+    """One generation request: the spec, the model, the real retrieval hits that
+    grounded it, and the ids of the questions it produced."""
+    try:
+        r = _get_store().get_request(request_id)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"question store unavailable: {e}") from e
+    if r is None:
+        raise HTTPException(status_code=404, detail=f"no stored request {request_id!r}")
+    return JSONResponse(r)
 
 
 @app.get("/healthz")
