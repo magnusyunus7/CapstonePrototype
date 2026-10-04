@@ -240,7 +240,7 @@ class QdrantClient:
 
 
 def _http_client() -> httpx.Client:
-    return httpx.Client(timeout=30.0)
+    return httpx.Client(timeout=120.0)
 
 
 class OllamaEmbedder:
